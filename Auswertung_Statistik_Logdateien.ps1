@@ -3,8 +3,8 @@
 # --- Konfiguration ---
 # Speicherort der Logdateien und der Ausgabedatei festlegen
 # PASSE DIESE PFADE AN DEINE UMGEBUNG AN!
-$logFilesPath = "C:\Users\top\Desktop\Analyzetool\Aumueller"
-$outputStatsCsvFile = "C:\Users\top\Desktop\Analyzetool\Aumueller\Gesamtauswertung_Statistik_Logfiles.csv"
+$logFilesPath = "C:\Users\top\Desktop\Analyzetool\AM"
+$outputStatsCsvFile = "C:\Users\top\Desktop\Analyzetool\AM\Gesamtauswertung_Statistik_Logfiles.csv"
 
 Write-Host "Daten des Ordners '$logFilesPath' werden analisiert." -ForegroundColor Green
 
