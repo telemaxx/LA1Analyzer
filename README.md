@@ -1,6 +1,8 @@
 # LA1Analyzer
 
-Ein sehr spezielles Tool, das für die meisten Benutzer nicht von Interesse ist. Nachfolgend einige Hinweise auf Deutsch.
+A very special Tool, not usefull for most People.
+
+Rest in German.
 
 ### Wichtiger Hinweis zur Ausführung
 
