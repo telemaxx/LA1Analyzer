@@ -6,17 +6,18 @@ Ein sehr spezielles Tool, das für die meisten Benutzer nicht von Interesse ist.
 
 Zurzeit sind die PowerShell-Skripte nicht signiert. Daher können sie nicht direkt per Doppelklick ausgeführt werden.
 
-Das bedeutet, die `ps1`-Datei muss zuerst lokal gespeichert und anschließend müssen die Pfade in der Datei angepasst werden.
+Das bedeutet folgenden Ablauf:
 
-**Beispiel:**
+Die `ps1`-Datei muss zuerst lokal gespeichert werden
+
+Dann die Datei mit einem Editor öffnen
+
+Die Pfade anpassen und wieder speichern
 
 ```powershell
 $logFilesPath = "C:\Users\top\git\LA1Analyzer\Samples\AM"
 $outputStatsXlsxFile = "C:\Users\top\git\LA1Analyzer\Samples\AM\Gesamtauswertung_Statistik_Logfiles.xlsx"
 ```
-
-Dann die Datei mit einem Editor öffnen den gesammten Inhalten makieren und kopieren (Strg A Strg C)
-
-Jetzt in der Powershell einfügen (Strg V)
-Warnung bestätigen.
+Den gesammten Inhalten makieren und kopieren (Strg A Strg C)
+In die Powershell wechseln und (Strg V) eingeben. Warnung bestätigen.
 
