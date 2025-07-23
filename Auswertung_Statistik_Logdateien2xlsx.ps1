@@ -276,3 +276,4 @@ Write-Host "-------------------------------------" -ForegroundColor Green
 Write-Host "Statistik-Verarbeitung abgeschlossen!" -ForegroundColor Green
 Write-Host "Die Daten wurden in '$outputStatsXlsxFile' gespeichert." -ForegroundColor Green
 Write-Host "Gesamtzahl der Statistik-Einträge: $($allStatsObjects.Count)" -ForegroundColor Green
+
