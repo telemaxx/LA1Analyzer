@@ -102,96 +102,111 @@ Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
     }
 
     # --- Datum extrahieren ---
-    $dateLine = $fileContent | Select-String -Pattern "^\s*LEVEL 1 : DAILY RESULTS : (.+?)\s*$"
-    if ($dateLine) {
-        $currentStats.Datum = ($dateLine.Matches[0].Groups[1].Value).Trim()
-        Write-Host "  DEBUG: Datum extrahiert: $($currentStats.Datum)" -ForegroundColor DarkYellow
+    # Finde die Zeile mit Select-String
+    $dateLineObj = $fileContent | Select-String -Pattern "^\s*LEVEL 1 : DAILY RESULTS : (.+?)\s*$"
+    if ($dateLineObj) {
+        # Wende den Regex auf die gefundene Zeile an, um $Matches zu füllen
+        if ($dateLineObj.Line -match "^\s*LEVEL 1 : DAILY RESULTS : (.+?)\s*$") {
+            $currentStats.Datum = ($Matches[1]).Trim()
+        }
     } else {
-        Write-Warning "  DEBUG: Konnte Datum in Datei '$($_.Name)' nicht finden."
+        # Write-Warning "  DEBUG: Konnte Datum in Datei '$($_.Name)' nicht finden."
     }
 
     # --- Performance-Daten extrahieren ---
-    $performanceLine = $fileContent | Select-String -Pattern "^\s*Performance: AVG:\s*(\d+\.?\d*|No Information),\s*PEAK:\s*(\d+\.?\d*|No Information),\s*Potential:\s*(\d+\.?\d*|No Information)\s*-\s*hc\s*(\d+\.?\d*%)\s*$"
-    if ($performanceLine) {
-        Write-Host "  DEBUG: Performance-Zeile gefunden: $($performanceLine.Line)" -ForegroundColor DarkYellow
+    $performanceLineObj = $fileContent | Select-String -Pattern "^\s*Performance: AVG:\s*(\d+\.?\d*|No Information),\s*PEAK:\s*(\d+\.?\d*|No Information),\s*Potential:\s*(\d+\.?\d*|No Information)\s*-\s*hc\s*(\d+\.?\d*%)\s*$"
+    if ($performanceLineObj) {
+        $performanceLine = $performanceLineObj.Line # Holen Sie sich die tatsächliche String-Zeile
         
-        # Überprüfen und parsen für AVG
-        $rawAvgValue = $performanceLine.Matches[0].Groups[1].Value.Trim()
-        $parsedAvg = 0.0 # Standardwert
-        if ($rawAvgValue -ne "No Information" -and [double]::TryParse($rawAvgValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedAvg)) {
-            $currentStats.Performance_AVG = $parsedAvg.ToString($cultureInfo)
-        } else {
-            $currentStats.Performance_AVG = "" # Oder 0.0, je nach gewünschtem Verhalten
-        }
+        # Wende den Regex auf die gefundene Zeile an, um $Matches zu füllen
+        if ($performanceLine -match "^\s*Performance: AVG:\s*(\d+\.?\d*|No Information),\s*PEAK:\s*(\d+\.?\d*|No Information),\s*Potential:\s*(\d+\.?\d*|No Information)\s*-\s*hc\s*(\d+\.?\d*%)\s*$") {
+            # Überprüfen und parsen für AVG
+            $rawAvgValue = $Matches[1].Trim()
+            $parsedAvg = 0.0 # Standardwert
+            if ($rawAvgValue -ne "No Information" -and [double]::TryParse($rawAvgValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedAvg)) {
+                $currentStats.Performance_AVG = $parsedAvg.ToString($cultureInfo)
+            } else {
+                $currentStats.Performance_AVG = "" # Oder 0.0, je nach gewünschtem Verhalten
+            }
 
-        # Überprüfen und parsen für PEAK
-        $rawPeakValue = $performanceLine.Matches[0].Groups[2].Value.Trim()
-        $parsedPeak = 0.0 # Standardwert
-        if ($rawPeakValue -ne "No Information" -and [double]::TryParse($rawPeakValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPeak)) {
-            $currentStats.Performance_PEAK = $parsedPeak.ToString($cultureInfo)
-        } else {
-            $currentStats.Performance_PEAK = ""
-        }
+            # Überprüfen und parsen für PEAK
+            $rawPeakValue = $Matches[2].Trim()
+            $parsedPeak = 0.0 # Standardwert
+            if ($rawPeakValue -ne "No Information" -and [double]::TryParse($rawPeakValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPeak)) {
+                $currentStats.Performance_PEAK = $parsedPeak.ToString($cultureInfo)
+            } else {
+                $currentStats.Performance_PEAK = ""
+            }
 
-        # Überprüfen und parsen für Potential
-        $rawPotentialValue = $performanceLine.Matches[0].Groups[3].Value.Trim()
-        $parsedPotential = 0.0 # Standardwert
-        if ($rawPotentialValue -ne "No Information" -and [double]::TryParse($rawPotentialValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPotential)) {
-            $currentStats.Performance_Potential = $parsedPotential.ToString($cultureInfo)
+            # Überprüfen und parsen für Potential
+            $rawPotentialValue = $Matches[3].Trim()
+            $parsedPotential = 0.0 # Standardwert
+            if ($rawPotentialValue -ne "No Information" -and [double]::TryParse($rawPotentialValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPotential)) {
+                $currentStats.Performance_Potential = $parsedPotential.ToString($cultureInfo)
+            } else {
+                $currentStats.Performance_Potential = ""
+            }
+            
+            # HC ist immer ein String (Prozent), keine Notwendigkeit zu parsen
+            $currentStats.Performance_HC = $Matches[4].Trim()
         } else {
-            $currentStats.Performance_Potential = ""
+            # Write-Warning "    DEBUG: Regex-Match für Performance-Werte in Zeile '$($performanceLine)' fehlgeschlagen. Werte bleiben leer. (Matches-Variable nicht gefüllt)"
         }
-        
-        # HC ist immer ein String (Prozent), keine Notwendigkeit zu parsen
-        $currentStats.Performance_HC = $performanceLine.Matches[0].Groups[4].Value.Trim()
-        Write-Host "    DEBUG: Performance-Werte zugewiesen: AVG=$($currentStats.Performance_AVG), PEAK=$($currentStats.Performance_PEAK), Potential=$($currentStats.Performance_Potential), HC=$($currentStats.Performance_HC)" -ForegroundColor DarkYellow
     } else {
-        Write-Warning "  DEBUG: 'Performance:' Zeile in Datei '$($_.Name)' nicht gefunden."
+        # Write-Warning "  DEBUG: 'Performance:' Zeile in Datei '$($_.Name)' nicht gefunden."
     }
 
     # --- Plate Production Daten extrahieren ---
-    $plateProductionLine = $fileContent | Select-String -Pattern "^\s*Plate Production:\s*(\d+)\s*,\s*Exposed Plates:\s*(\d+)\s*,\s*Damaged Plates:\s*(\d+)\s*$"
-    if ($plateProductionLine) {
-        Write-Host "  DEBUG: Plate Production Zeile gefunden: $($plateProductionLine.Line)" -ForegroundColor DarkYellow
+    $plateProductionLineObj = $fileContent | Select-String -Pattern "^\s*Plate Production:\s*(\d+)\s*,\s*Exposed Plates:\s*(\d+)\s*,\s*Damaged Plates:\s*(\d+)\s*$"
+    if ($plateProductionLineObj) {
+        $plateProductionLine = $plateProductionLineObj.Line # Holen Sie sich die tatsächliche String-Zeile
         
-        $parsedProd = 0 # Standardwert
-        if ([int]::TryParse($plateProductionLine.Matches[0].Groups[1].Value.Trim(), [ref]$parsedProd)) {
-            $currentStats.Plate_Production = $parsedProd
-        } else {
-            $currentStats.Plate_Production = 0
-        }
+        # Wende den Regex auf die gefundene Zeile an, um $Matches zu füllen
+        if ($plateProductionLine -match "^\s*Plate Production:\s*(\d+)\s*,\s*Exposed Plates:\s*(\d+)\s*,\s*Damaged Plates:\s*(\d+)\s*$") {
+            $parsedProd = 0 # Standardwert
+            if ([int]::TryParse($Matches[1].Trim(), [ref]$parsedProd)) {
+                $currentStats.Plate_Production = $parsedProd
+            } else {
+                $currentStats.Plate_Production = 0
+            }
 
-        $parsedExp = 0 # Standardwert
-        if ([int]::TryParse($plateProductionLine.Matches[0].Groups[2].Value.Trim(), [ref]$parsedExp)) {
-            $currentStats.Exposed_Plates = $parsedExp
-        } else {
-            $currentStats.Exposed_Plates = 0
-        }
+            $parsedExp = 0 # Standardwert
+            if ([int]::TryParse($Matches[2].Trim(), [ref]$parsedExp)) {
+                $currentStats.Exposed_Plates = $parsedExp
+            } else {
+                $currentStats.Exposed_Plates = 0
+            }
 
-        $parsedDam = 0 # Standardwert
-        if ([int]::TryParse($plateProductionLine.Matches[0].Groups[3].Value.Trim(), [ref]$parsedDam)) {
-            $currentStats.Damaged_Plates = $parsedDam
+            $parsedDam = 0 # Standardwert
+            if ([int]::TryParse($Matches[3].Trim(), [ref]$parsedDam)) {
+                $currentStats.Damaged_Plates = $parsedDam
+            } else {
+                $currentStats.Damaged_Plates = 0
+            }
         } else {
-            $currentStats.Damaged_Plates = 0
+            # Write-Warning "    DEBUG: Regex-Match für Plate Production in Zeile '$($plateProductionLine)' fehlgeschlagen. Werte bleiben 0."
         }
-        Write-Host "    DEBUG: Plate Production Werte zugewiesen: Prod=$($currentStats.Plate_Production), Exp=$($currentStats.Exposed_Plates), Dam=$($currentStats.Damaged_Plates)" -ForegroundColor DarkYellow
     } else {
-        Write-Warning "  DEBUG: 'Plate Production:' Zeile in Datei '$($_.Name)' nicht gefunden."
+        # Write-Warning "  DEBUG: 'Plate Production:' Zeile in Datei '$($_.Name)' nicht gefunden."
     }
 
     # --- Plate Count Daten extrahieren ---
-    $plateCountLine = $fileContent | Select-String -Pattern "^\s*Plate Count:\s*(\d+)\s*$"
-    if ($plateCountLine) {
-        Write-Host "  DEBUG: Plate Count Zeile gefunden: $($plateCountLine.Line)" -ForegroundColor DarkYellow
+    $plateCountLineObj = $fileContent | Select-String -Pattern "^\s*Plate Count:\s*(\d+)\s*$"
+    if ($plateCountLineObj) {
+        $plateCountLine = $plateCountLineObj.Line # Holen Sie sich die tatsächliche String-Zeile
         $parsedCount = 0 # Standardwert
-        if ([int]::TryParse($plateCountLine.Matches[0].Groups[1].Value.Trim(), [ref]$parsedCount)) {
-            $currentStats.Plate_Count = $parsedCount
+        # Wende den Regex auf die gefundene Zeile an, um $Matches zu füllen
+        if ($plateCountLine -match "^\s*Plate Count:\s*(\d+)\s*$") {
+            if ([int]::TryParse($Matches[1].Trim(), [ref]$parsedCount)) {
+                $currentStats.Plate_Count = $parsedCount
+            } else {
+                $currentStats.Plate_Count = 0
+            }
         } else {
-            $currentStats.Plate_Count = 0
+            # Write-Warning "    DEBUG: Regex-Match für Plate Count in Zeile '$($plateCountLine)' fehlgeschlagen. Wert bleibt 0."
         }
-        Write-Host "    DEBUG: Plate Count Wert zugewiesen: Count=$($currentStats.Plate_Count)" -ForegroundColor DarkYellow
     } else {
-        Write-Warning "  DEBUG: 'Plate Count:' Zeile in Datei '$($_.Name)' nicht gefunden."
+        # Write-Warning "  DEBUG: 'Plate Count:' Zeile in Datei '$($_.Name)' nicht gefunden."
     }
 
     # --- Message Statistics Daten extrahieren ---
@@ -212,42 +227,40 @@ Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
     }
 
     if ($startIndex -ne -1 -and $endIndex -ne -1) {
-        Write-Host "  DEBUG: Message Statistics Block gefunden. Verarbeite Datenzeilen." -ForegroundColor DarkCyan
+        # Write-Host "  DEBUG: Message Statistics Block gefunden. Verarbeite Datenzeilen." -ForegroundColor DarkCyan
         # Extrahiere den relevanten Block (Datenzeilen zwischen den Trennstrichen)
         $messageStatsBlock = $fileContent[($startIndex + 2)..($endIndex - 1)]
 
         foreach ($line in $messageStatsBlock) {
             # Regex, um Anzahl und Fehlercode aus jeder Statistikzeile zu extrahieren
-            $match = $line | Select-String -Pattern "^\s*(\d+)\s*\|.*?\|(ERR_\d+).*$"
-            if ($match) {
-                Write-Host "    DEBUG: Message Statistics Datenzeile gefunden: $($match.Line)" -ForegroundColor DarkYellow
+            # Hier verwenden wir direkt den -match Operator auf der Zeile, da $line bereits ein String ist
+            if ($line -match "^\s*(\d+)\s*\|.*?\|(ERR_\d+).*$") {
                 $count = 0 # Standardwert
-                $errorCode = $match.Matches[0].Groups[2].Value.Trim() # Fehlercode als String
+                $errorCode = $Matches[2].Trim() # Fehlercode als String
 
-                if ([int]::TryParse($match.Matches[0].Groups[1].Value.Trim(), [ref]$count)) { # Zähler als Integer
+                if ([int]::TryParse($Matches[1].Trim(), [ref]$count)) { # Zähler als Integer
                     # Wenn der Fehlercode in unserer Liste ist, aktualisiere den Zähler
                     if ($errorCodesToTrack -contains $errorCode) {
                         # Verwende den bereinigten Eigenschaftsnamen (mit "E_" Präfix)
                         $propertyName = "E_" + $errorCode.Replace('ERR_','')
                         $currentStats.$propertyName = $count
-                        Write-Host "      DEBUG: Statistik: '$errorCode' = '$count' (zugewiesen zu $($propertyName))" -ForegroundColor DarkYellow
                     } else {
-                        Write-Host "      DEBUG: Fehlercode '$errorCode' nicht in 'errorCodesToTrack' Liste." -ForegroundColor DarkGray
+                        # Write-Host "      DEBUG: Fehlercode '$errorCode' nicht in 'errorCodesToTrack' Liste." -ForegroundColor DarkGray
                     }
                 } else {
-                    Write-Host "      DEBUG: Konnte Zähler für Fehlercode '$errorCode' nicht parsen. Wert bleibt 0." -ForegroundColor DarkRed
+                    # Write-Host "      DEBUG: Konnte Zähler für Fehlercode '$errorCode' nicht parsen. Wert bleibt 0." -ForegroundColor DarkRed
                 }
             } else {
-                Write-Host "    DEBUG: Zeile im Message Statistics Block passt nicht zum Muster: '$line'" -ForegroundColor DarkGray
+                # Write-Host "    DEBUG: Zeile im Message Statistics Block passt nicht zum Muster: '$line'" -ForegroundColor DarkGray
             }
         }
     } else {
-        Write-Warning "  DEBUG: Message Statistics Block in Datei '$($_.Name)' nicht gefunden oder unvollständig. Fehlerzählungen bleiben 0."
+        Write-Warning "Message Statistics Block in Datei '$($_.Name)' nicht gefunden oder unvollständig. Fehlerzählungen bleiben 0."
     }
 
     # Füge das gesammelte Objekt zur Liste hinzu
     $allStatsObjects += $currentStats
-    Write-Host "  DEBUG: Hinzugefügtes Gesamt-Statistik-Objekt für '$($_.Name)'." -ForegroundColor Green
+    # Write-Host "  DEBUG: Hinzugefügtes Gesamt-Statistik-Objekt für '$($_.Name)'." -ForegroundColor Green
     # Optional: Zeigen Sie das Objekt an, um zu überprüfen, ob es Daten enthält
     # $currentStats | Format-List
 }
