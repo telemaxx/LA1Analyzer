@@ -7,7 +7,7 @@ param(
 )
 
 # --- Konfiguration ---
-# NEU: Standardwert für "Performance_Potential", falls in der Logdatei "No Information" steht.
+# Standardwert für "Performance_Potential", falls in der Logdatei "No Information" steht.
 $defaultPotentialValue = 999 
 
 Write-Host "Standardwert für 'Potential' ist auf '$defaultPotentialValue' gesetzt." -ForegroundColor Cyan
@@ -49,7 +49,7 @@ if ([string]::IsNullOrEmpty($logFilesPath) -or (-not (Test-Path -Path $logFilesP
     return
 }
 
-# NEU: Der Output-Pfad wird nun basierend auf dem gewählten Log-Pfad generiert
+# Der Output-Pfad wird nun basierend auf dem gewählten Log-Pfad generiert
 $outputStatsXlsxFile = Join-Path -Path $logFilesPath -ChildPath "Gesamtauswertung_Statistik_Logfiles.xlsx"
 
 Write-Host "Daten des Ordners '$logFilesPath' werden analysiert." -ForegroundColor Green
@@ -136,7 +136,7 @@ Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
 
     foreach ($code in $errorCodesToTrack) {
         $propertyName = "E_" + $code.Replace('ERR_','')
-        Add-Member -InputObject $currentStats -NotePropertyName $propertyName -NotePropertyValue 0
+        Add-Member -InputObject $currentStats -NotePropertyName $propertyName -NotePropertyValue ([int]0) 
     }
 
     # --- Datum extrahieren ---
@@ -148,8 +148,6 @@ Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
     }
 
     # --- Performance-Daten extrahieren ---
-    # GEÄNDERT: Der Regex wurde angepasst, um den "- hc" Teil optional zu machen.
-    # Die Gruppe (?:...) macht den Teil optional, ohne eine neue Fanggruppe zu erstellen.
     $performanceLineObj = $fileContent | Select-String -Pattern "^\s*Performance: AVG:\s*(\d+\.?\d*|No Information),\s*PEAK:\s*(\d+\.?\d*|No Information),\s*Potential:\s*(\d+\.?\d*|No Information)(?:\s*-\s*hc\s*(\d+\.?\d*%))?\s*$"
     if ($performanceLineObj) {
         $performanceLine = $performanceLineObj.Line
@@ -173,13 +171,11 @@ Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
                 $currentStats.Performance_PEAK = ""
             }
 
-            # GEÄNDERT: Potential verarbeiten mit Standardwert-Logik
+            # Potential verarbeiten mit Standardwert-Logik
             $rawPotentialValue = $Matches[3].Trim()
             if ($rawPotentialValue -eq "No Information") {
-                # Wenn "No Information", verwende den konfigurierten Standardwert
                 $currentStats.Performance_Potential = $defaultPotentialValue.ToString($cultureInfo)
             } else {
-                # Ansonsten versuche, den Wert zu parsen
                 $parsedPotential = 0.0
                 if ([double]::TryParse($rawPotentialValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPotential)) {
                     $currentStats.Performance_Potential = $parsedPotential.ToString($cultureInfo)
@@ -188,12 +184,11 @@ Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
                 }
             }
             
-            # GEÄNDERT: HC verarbeiten (nur wenn vorhanden)
-            # $Matches[4] existiert nur, wenn der optionale Teil im Regex gefunden wurde.
+            # HC verarbeiten (nur wenn vorhanden)
             if ($Matches.Count -ge 5 -and -not [string]::IsNullOrWhiteSpace($Matches[4])) {
                 $currentStats.Performance_HC = $Matches[4].Trim()
             } else {
-                $currentStats.Performance_HC = "" # Ansonsten leer lassen
+                $currentStats.Performance_HC = "" 
             }
         }
     }
@@ -238,7 +233,7 @@ Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
                 $errorCode = $Matches[2].Trim()
                 if ($errorCodesToTrack -contains $errorCode) {
                     $propertyName = "E_" + $errorCode.Replace('ERR_','')
-                    $currentStats.$propertyName = $count
+                    $currentStats.$propertyName = ([int]$count) # Sicherstellen, dass der Wert als [int] gesetzt wird
                 }
             }
         }
@@ -252,15 +247,18 @@ Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
 # --- Statistik-XLSX-Datei schreiben ---
 if ($allStatsObjects.Count -gt 0) {
     Write-Host "`n--- Schreibe Statistik-XLSX-Datei ---" -ForegroundColor Yellow
+    
+    # Try-Catch Block für den Export
     try {
         $allStatsObjects | Export-Excel -Path $outputStatsXlsxFile -AutoSize -ClearSheet -AutoFilter -ErrorAction Stop
         Write-Host "-------------------------------------" -ForegroundColor Green
         Write-Host "Statistik-Verarbeitung abgeschlossen!" -ForegroundColor Green
         Write-Host "Die Daten wurden in '$outputStatsXlsxFile' gespeichert." -ForegroundColor Green
         Write-Host "Gesamtzahl der Statistik-Einträge: $($allStatsObjects.Count)" -ForegroundColor Green
+
     } catch {
-        Write-Error "FEHLER beim Schreiben der Excel-Datei: $($_.Exception.Message)"
-        Write-Error "Möglicherweise ist die Datei '$outputStatsXlsxFile' geöffnet und blockiert den Zugriff."
+        Write-Error "FEHLER beim Exportieren der Excel-Datei: $($_.Exception.Message)"
+        Write-Error "Möglicherweise ist die Datei '$outputStatsXlsxFile' geöffnet und blockiert den Zugriff. Bitte schließen Sie die Datei und versuchen Sie es erneut."
     }
 } else {
     Write-Warning "`nKeine Daten zum Exportieren gefunden. Es wurde keine Excel-Datei erstellt."
