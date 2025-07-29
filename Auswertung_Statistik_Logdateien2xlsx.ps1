@@ -1,16 +1,60 @@
 # Gesamtes PowerShell-Skript zur Analyse von .LA1.txt Logdateien und Erstellung einer Statistik-XLSX
 
-# --- Konfiguration ---
-# Speicherort der Logdateien und der Ausgabedatei festlegen
-# PASSE DIESE PFADE AN DEINE UMGEBUNG AN!
-$logFilesPath = "C:\Users\top\git\LA1Analyzer\Samples\Meyer"
-$outputStatsXlsxFile = "C:\Users\top\git\LA1Analyzer\Samples\Meyer\Gesamtauswertung_Statistik_Logfiles.xlsx"
+# --- Parameter-Definition ---
+param(
+    [Parameter(Mandatory=$false)]
+    [string]$LogPath # Optionale Pfadangabe beim Skriptaufruf
+)
 
+# --- Konfiguration ---
 # NEU: Standardwert für "Performance_Potential", falls in der Logdatei "No Information" steht.
-$defaultPotentialValue = 20
+$defaultPotentialValue = 999 
+
+Write-Host "Standardwert für 'Potential' ist auf '$defaultPotentialValue' gesetzt." -ForegroundColor Cyan
+
+# --- Pfad für Logdateien festlegen (Parameter > Standard > Interaktiv) ---
+$defaultLogPath = "C:\Users\top\git\LA1Analyzer\Samples\AM" # Dein ursprünglicher Standardpfad
+
+$logFilesPath = $null
+
+# Prüfen, ob der Pfad über den Parameter übergeben wurde
+if (-not [string]::IsNullOrEmpty($LogPath)) {
+    $logFilesPath = $LogPath
+    Write-Host "Verwende Logdateipfad aus Parameter: '$logFilesPath'" -ForegroundColor Green
+}
+# Wenn nicht über Parameter, versuche den Standardpfad
+elseif (Test-Path -Path $defaultLogPath -PathType Container) {
+    $logFilesPath = $defaultLogPath
+    Write-Host "Verwende Standard-Logdateipfad: '$logFilesPath'" -ForegroundColor Green
+}
+# Wenn weder Parameter noch gültiger Standardpfad, interaktiv abfragen
+else {
+    Write-Warning "Weder ein gültiger Pfad wurde per Parameter übergeben, noch existiert der Standardpfad."
+    do {
+        $inputPath = Read-Host "Bitte geben Sie den Pfad zu den Logdateien ein (z.B. C:\Logs)"
+        $logFilesPath = $inputPath.Trim()
+
+        if (-not (Test-Path -Path $logFilesPath -PathType Container)) {
+            Write-Warning "Der angegebene Pfad '$logFilesPath' existiert nicht oder ist kein Verzeichnis. Bitte versuchen Sie es erneut."
+            $logFilesPath = "" # Setzt den Pfad zurück, damit die Schleife wiederholt wird
+        }
+
+    } while ([string]::IsNullOrEmpty($logFilesPath))
+    Write-Host "Verwende interaktiv eingegebenen Pfad: '$logFilesPath'" -ForegroundColor Green
+}
+
+# Finaler Check, ob ein Pfad gefunden wurde, bevor weitergemacht wird
+if ([string]::IsNullOrEmpty($logFilesPath) -or (-not (Test-Path -Path $logFilesPath -PathType Container))) {
+    Write-Error "Es konnte kein gültiger Pfad zu den Logdateien ermittelt werden. Skript wird beendet."
+    return
+}
+
+# NEU: Der Output-Pfad wird nun basierend auf dem gewählten Log-Pfad generiert
+$outputStatsXlsxFile = Join-Path -Path $logFilesPath -ChildPath "Gesamtauswertung_Statistik_Logfiles.xlsx"
 
 Write-Host "Daten des Ordners '$logFilesPath' werden analysiert." -ForegroundColor Green
-Write-Host "Standardwert für 'Potential' ist auf '$defaultPotentialValue' gesetzt." -ForegroundColor Cyan
+Write-Host "Die Statistikdatei wird unter '$outputStatsXlsxFile' gespeichert." -ForegroundColor Green
+
 
 # Wichtig: Kultur-Info für die korrekte Dezimaltrennzeichen-Formatierung
 # Für Deutschland (Komma als Dezimaltrennzeichen):
@@ -24,22 +68,23 @@ $errorCodesToTrack = @(
     "ERR_00460", "ERR_04751", "ERR_04758", "ERR_04760", "ERR_04761",
     "ERR_04773", "ERR_04818", "ERR_04824", "ERR_05010", "ERR_05013",
     "ERR_05029", "ERR_05073", "ERR_05079", "ERR_05086", "ERR_05127",
-    "ERR_05354", "ERR_05360", "ERR_05366", "ERR_05413", "ERR_05439",
-    "ERR_05454", "ERR_06165", "ERR_06327", "ERR_06433", "ERR_06456",
-    "ERR_06461", "ERR_06474", "ERR_06483", "ERR_06484", "ERR_06485",
-    "ERR_06486", "ERR_06487", "ERR_06495", "ERR_06502", "ERR_06503",
-    "ERR_06505", "ERR_06601", "ERR_07504", "ERR_07602", "ERR_07609",
-    "ERR_07610", "ERR_07616", "ERR_07617", "ERR_07619", "ERR_07654",
-    "ERR_07656", "ERR_07951", "ERR_08003", "ERR_08004", "ERR_08007",
-    "ERR_08009", "ERR_08105", "ERR_08107", "ERR_08109", "ERR_08110",
-    "ERR_08111", "ERR_08203", "ERR_08214", "ERR_08215", "ERR_08216",
-    "ERR_08242", "ERR_08243", "ERR_08244", "ERR_08245", "ERR_08246",
-    "ERR_08301", "ERR_08302", "ERR_08303", "ERR_08304", "ERR_08305",
-    "ERR_08311", "ERR_08312", "ERR_08314", "ERR_08318", "ERR_08326",
-    "ERR_08330", "ERR_08337", "ERR_10462", "ERR_10830", "ERR_10853",
-    "ERR_10855", "ERR_10865", "ERR_10866", "ERR_10901", "ERR_10905",
-    "ERR_10906", "ERR_10908", "ERR_10910", "ERR_10913", "ERR_10914",
-    "ERR_10919", "ERR_10921", "ERR_10924", "ERR_11000", "ERR_11046"
+    "ERR_05354", "ERR_05360", "ERR_05366", "ERR_05413", "ERR_05433",
+    "ERR_05439", "ERR_05454", "ERR_06165", "ERR_06327", "ERR_06433",
+    "ERR_06456", "ERR_06461", "ERR_06474", "ERR_06483", "ERR_06484",
+    "ERR_06485", "ERR_06486", "ERR_06487", "ERR_06495", "ERR_06502",
+    "ERR_06503", "ERR_06505", "ERR_06601", "ERR_07504", "ERR_07602",
+    "ERR_07609", "ERR_07610", "ERR_07616", "ERR_07617", "ERR_07619",
+    "ERR_07654", "ERR_07656", "ERR_07951", "ERR_08003", "ERR_08004",
+    "ERR_08007", "ERR_08009", "ERR_08105", "ERR_08107", "ERR_08109",
+    "ERR_08110", "ERR_08111", "ERR_08203", "ERR_08214", "ERR_08215",
+    "ERR_08216", "ERR_08242", "ERR_08243", "ERR_08244", "ERR_08245",
+    "ERR_08246", "ERR_08301", "ERR_08302", "ERR_08303", "ERR_08304",
+    "ERR_08305", "ERR_08311", "ERR_08312", "ERR_08314", "ERR_08318",
+    "ERR_08326", "ERR_08330", "ERR_08337", "ERR_10462", "ERR_10830",
+    "ERR_10853", "ERR_10855", "ERR_10865", "ERR_10866", "ERR_10901",
+    "ERR_10905", "ERR_10906", "ERR_10908", "ERR_10910", "ERR_10913",
+    "ERR_10914", "ERR_10919", "ERR_10921", "ERR_10924", "ERR_11000",
+    "ERR_11046"
 )
 
 # --- Überprüfen und Installieren des ImportExcel Moduls ---
