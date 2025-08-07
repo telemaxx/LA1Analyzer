@@ -21,14 +21,12 @@ $logFilesPath = $null
 if (-not [string]::IsNullOrEmpty($LogPath)) {
     $logFilesPath = $LogPath
     Write-Host "Verwende Logdateipfad aus Parameter: '$logFilesPath'" -ForegroundColor Green
-}
-# Wenn nicht über Parameter, versuche den Standardpfad
-elseif (Test-Path -Path $defaultLogPath -PathType Container) {
+} elseif (Test-Path -Path $defaultLogPath -PathType Container) {
+    # Wenn nicht über Parameter, versuche den Standardpfad	
     $logFilesPath = $defaultLogPath
     Write-Host "Verwende Standard-Logdateipfad: '$logFilesPath'" -ForegroundColor Green
-}
-# Wenn weder Parameter noch gültiger Standardpfad, interaktiv abfragen
-else {
+} else {
+# Wenn weder Parameter noch gültiger Standardpfad, interaktiv abfragen	
     Write-Warning "Weder ein gültiger Pfad wurde per Parameter übergeben, noch existiert der Standardpfad."
     do {
         $inputPath = Read-Host "Bitte geben Sie den Pfad zu den Logdateien ein (z.B. C:\Logs)"
@@ -94,8 +92,7 @@ if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
     try {
         Install-Module -Name ImportExcel -Force -Scope CurrentUser -ErrorAction Stop
         Write-Host "Das 'ImportExcel' Modul wurde erfolgreich installiert." -ForegroundColor Green
-    }
-    catch {
+    } catch {
         Write-Error "Fehler beim Installieren des 'ImportExcel' Moduls: $($_.Exception.Message)"
         Write-Error "Bitte installieren Sie es manuell mit: Install-Module -Name ImportExcel -Scope CurrentUser"
         return # Skript beenden, wenn das Modul nicht installiert werden kann
