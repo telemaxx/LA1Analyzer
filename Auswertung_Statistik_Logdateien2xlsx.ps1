@@ -29,9 +29,12 @@ if (-not [string]::IsNullOrEmpty($LogPath)) {
 # Wenn weder Parameter noch gültiger Standardpfad, interaktiv abfragen	
     Write-Warning "Weder ein gültiger Pfad wurde per Parameter übergeben, noch existiert der Standardpfad."
     do {
-        $inputPath = Read-Host "Bitte geben Sie den Pfad zu den Logdateien ein (z.B. C:\Logs)"
+        Add-Type -AssemblyName System.Windows.Forms
+        $browser = New-Object System.Windows.Forms.FolderBrowserDialog
+        $null = $browser.ShowDialog()
+        $inputPath = $browser.SelectedPath
+#        $inputPath = Read-Host "Bitte geben Sie den Pfad zu den Logdateien ein (z.B. C:\Logs)"
         $logFilesPath = $inputPath.Trim()
-
         if (-not (Test-Path -Path $logFilesPath -PathType Container)) {
             Write-Warning "Der angegebene Pfad '$logFilesPath' existiert nicht oder ist kein Verzeichnis. Bitte versuchen Sie es erneut."
             $logFilesPath = "" # Setzt den Pfad zurück, damit die Schleife wiederholt wird
