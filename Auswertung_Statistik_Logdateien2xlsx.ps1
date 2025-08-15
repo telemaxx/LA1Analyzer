@@ -85,7 +85,8 @@ $errorCodesToTrack = @(
     "ERR_10853", "ERR_10855", "ERR_10865", "ERR_10866", "ERR_10901",
     "ERR_10905", "ERR_10906", "ERR_10908", "ERR_10910", "ERR_10913",
     "ERR_10914", "ERR_10919", "ERR_10921", "ERR_10924", "ERR_11000",
-    "ERR_11046"
+    "ERR_11046",
+	"ERR_04822", "ERR_04824", "ERR_05070"
 )
 
 # --- Überprüfen und Installieren des ImportExcel Moduls ---
