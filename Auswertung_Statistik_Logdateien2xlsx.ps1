@@ -74,6 +74,11 @@ $errorCodesToTrack = @(
 )
 
 # --- Überprüfen und Installieren des ImportExcel Moduls ---
+# --- Hinweis:
+# --- Update mit: Update-Module -Name ImportExcel
+# --- Version anzeigen: Get-InstalledModule -Name ImportExcel
+# --- Alle Module: einfach -Name ImportExcel weglassen.
+
 Write-Host "Überprüfe, ob das 'ImportExcel' Modul installiert ist..." -ForegroundColor Cyan
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
     Write-Warning "Das 'ImportExcel' Modul ist nicht installiert. Versuche, es zu installieren."
