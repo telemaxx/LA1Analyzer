@@ -2,74 +2,15 @@
 
 # --- Konfiguration ---
 # Standardwert für "Performance_Potential", falls in der Logdatei "No Information" steht.
-# Dieser Wert wird nun über eine GUI abgefragt.
 $defaultPotentialValue = 999 
 
-# --- GUI zur Abfrage des Standardwerts für 'Potential' ---
-Write-Host "Öffne Fenster zur Eingabe des Standardwerts für 'Potential'." -ForegroundColor Cyan
-
-try {
-    # Benötigt für GUI-Elemente
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
-
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = "Standardwert für 'Potential' festlegen"
-    $form.Size = New-Object System.Drawing.Size(400,150)
-    $form.StartPosition = "CenterScreen"
-    $form.FormBorderStyle = "FixedDialog"
-    $form.MinimizeBox = $false
-    $form.MaximizeBox = $false
-
-    $label = New-Object System.Windows.Forms.Label
-    $label.Location = New-Object System.Drawing.Point(10,20)
-    $label.Size = New-Object System.Drawing.Size(350,20)
-    $label.Text = "Standardwert für 'Performance_Potential' bei 'No Information':"
-
-    $textBox = New-Object System.Windows.Forms.TextBox
-    $textBox.Location = New-Object System.Drawing.Point(10,50)
-    $textBox.Size = New-Object System.Drawing.Size(360,20)
-    $textBox.Text = $defaultPotentialValue # Setze den aktuellen Standardwert als Text
-
-    $buttonOk = New-Object System.Windows.Forms.Button
-    $buttonOk.Location = New-Object System.Drawing.Point(280,80)
-    $buttonOk.Size = New-Object System.Drawing.Size(90,25)
-    $buttonOk.Text = "OK"
-    $buttonOk.DialogResult = [System.Windows.Forms.DialogResult]::OK
-
-    $form.AcceptButton = $buttonOk
-    $form.Controls.Add($label)
-    $form.Controls.Add($textBox)
-    $form.Controls.Add($buttonOk)
-
-    $result = $form.ShowDialog()
-
-    if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-        $inputValue = $textBox.Text.Trim()
-        # **KORREKTUR:** [double] statt [int] für robustere Verarbeitung
-        if ([double]::TryParse($inputValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedValue)) {
-            $defaultPotentialValue = $parsedValue
-            Write-Host "Verwende eingegebenen Standardwert: '$defaultPotentialValue'" -ForegroundColor Green
-        } else {
-            Write-Warning "Ungültige Eingabe. Verwende weiterhin den Standardwert von 999."
-        }
-    } else {
-        Write-Warning "Eingabe abgebrochen. Verwende weiterhin den Standardwert von 999."
-    }
-} catch {
-    Write-Warning "Konnte GUI nicht anzeigen. Verwende den Standardwert von 999."
-}
-# Informiere über den finalen Wert, der verwendet wird
 Write-Host "Standardwert für 'Potential' ist auf '$defaultPotentialValue' gesetzt." -ForegroundColor Cyan
 
 # --- Pfad für Logdateien festlegen (immer über interaktive GUI) ---
 $logFilesPath = $null
 
 do {
-    # Benötigt für GUI-Elemente
     Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
-
     $browser = New-Object System.Windows.Forms.FolderBrowserDialog
     # Setze den Dialog-Titel für mehr Klarheit
     $browser.Description = "Bitte wählen Sie den Ordner mit den .LA1.txt Logdateien aus."
@@ -93,12 +34,7 @@ do {
 
 Write-Host "Verwende interaktiv ausgewählten Pfad: '$logFilesPath'" -ForegroundColor Green
 
-
-# Der Output-Pfad wird nun basierend auf dem gewählten Log-Pfad generiert
-$outputStatsXlsxFile = Join-Path -Path $logFilesPath -ChildPath "Gesamtauswertung_Statistik_Logfiles.xlsx"
-
 Write-Host "Daten des Ordners '$logFilesPath' werden analysiert." -ForegroundColor Green
-Write-Host "Die Statistikdatei wird unter '$outputStatsXlsxFile' gespeichert." -ForegroundColor Green
 
 
 # Wichtig: Kultur-Info für die korrekte Dezimaltrennzeichen-Formatierung
@@ -134,4 +70,193 @@ $errorCodesToTrack = @(
 
 # --- Überprüfen und Installieren des ImportExcel Moduls ---
 Write-Host "Überprüfe, ob das 'ImportExcel' Modul installiert ist..." -ForegroundColor Cyan
-if (-not (Get-Module -ListAvailable -Name ImportExcel))
+if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
+    Write-Warning "Das 'ImportExcel' Modul ist nicht installiert. Versuche, es zu installieren."
+    try {
+        Install-Module -Name ImportExcel -Force -Scope CurrentUser -ErrorAction Stop
+        Write-Host "Das 'ImportExcel' Modul wurde erfolgreich installiert." -ForegroundColor Green
+    } catch {
+        Write-Error "Fehler beim Installieren des 'ImportExcel' Moduls: $($_.Exception.Message)"
+        Write-Error "Bitte installieren Sie es manuell mit: Install-Module -Name ImportExcel -Scope CurrentUser"
+        return # Skript beenden, wenn das Modul nicht installiert werden kann
+    }
+} else {
+    Write-Host "Das 'ImportExcel' Modul ist bereits installiert." -ForegroundColor Green
+}
+
+# Importiere das Modul, um seine Funktionen nutzen zu können
+Import-Module -Name ImportExcel -ErrorAction Stop
+
+# Leere Liste für alle gesammelten Statistikobjekte aus den Logdateien
+$allStatsObjects = @()
+
+# --- Hauptverarbeitung: Schleife durch alle .LA1.txt-Dateien ---
+Get-ChildItem -Path $logFilesPath -Filter "*.LA1.txt" | ForEach-Object {
+    $currentFile = $_.FullName
+    Write-Host "`nVerarbeite Statistikdatei: $($_.Name)" -ForegroundColor Green
+
+    $fileContent = Get-Content -Path $currentFile -ErrorAction SilentlyContinue
+
+    if (-not $fileContent) {
+        Write-Warning "Konnte Inhalt der Datei '$($_.Name)' nicht lesen. Überspringe diese Datei."
+        return
+    }
+
+    $currentStats = [PSCustomObject]@{
+        Datum               = ""
+        Performance_AVG     = ""
+        Performance_PEAK    = ""
+        Performance_Potential = ""
+        Performance_HC      = ""
+        Plate_Production    = ""
+        Exposed_Plates      = ""
+        Damaged_Plates      = ""
+        Plate_Count         = ""
+    }
+
+    foreach ($code in $errorCodesToTrack) {
+        $propertyName = "E_" + $code.Replace('ERR_','')
+        Add-Member -InputObject $currentStats -NotePropertyName $propertyName -NotePropertyValue ([int]0) 
+    }
+
+    # --- Datum extrahieren ---
+    $dateLineObj = $fileContent | Select-String -Pattern "^\s*LEVEL 1 : DAILY RESULTS : (.+?)\s*$"
+    if ($dateLineObj) {
+        if ($dateLineObj.Line -match "^\s*LEVEL 1 : DAILY RESULTS : (.+?)\s*$") {
+            $currentStats.Datum = ($Matches[1]).Trim()
+        }
+    }
+
+    # --- Performance-Daten extrahieren ---
+    $performanceLineObj = $fileContent | Select-String -Pattern "^\s*Performance: AVG:\s*(\d+\.?\d*|No Information),\s*PEAK:\s*(\d+\.?\d*|No Information),\s*Potential:\s*(\d+\.?\d*|No Information)(?:\s*-\s*hc\s*(\d+\.?\d*%))?\s*$"
+    if ($performanceLineObj) {
+        $performanceLine = $performanceLineObj.Line
+        
+        if ($performanceLine -match "^\s*Performance: AVG:\s*(\d+\.?\d*|No Information),\s*PEAK:\s*(\d+\.?\d*|No Information),\s*Potential:\s*(\d+\.?\d*|No Information)(?:\s*-\s*hc\s*(\d+\.?\d*%))?\s*$") {
+            # AVG verarbeiten
+            $rawAvgValue = $Matches[1].Trim()
+            $parsedAvg = 0.0
+            if ($rawAvgValue -ne "No Information" -and [double]::TryParse($rawAvgValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedAvg)) {
+                $currentStats.Performance_AVG = $parsedAvg.ToString($cultureInfo)
+            } else {
+                $currentStats.Performance_AVG = ""
+            }
+
+            # PEAK verarbeiten
+            $rawPeakValue = $Matches[2].Trim()
+            $parsedPeak = 0.0
+            if ($rawPeakValue -ne "No Information" -and [double]::TryParse($rawPeakValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPeak)) {
+                $currentStats.Performance_PEAK = $parsedPeak.ToString($cultureInfo)
+            } else {
+                $currentStats.Performance_PEAK = ""
+            }
+
+            # Potential verarbeiten mit Standardwert-Logik
+            $rawPotentialValue = $Matches[3].Trim()
+            if ($rawPotentialValue -eq "No Information") {
+                $currentStats.Performance_Potential = $defaultPotentialValue.ToString($cultureInfo)
+            } else {
+                $parsedPotential = 0.0
+                if ([double]::TryParse($rawPotentialValue, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPotential)) {
+                    $currentStats.Performance_Potential = $parsedPotential.ToString($cultureInfo)
+                } else {
+                    $currentStats.Performance_Potential = ""
+                }
+            }
+            
+            # HC verarbeiten (nur wenn vorhanden)
+            if ($Matches.Count -ge 5 -and -not [string]::IsNullOrWhiteSpace($Matches[4])) {
+                $currentStats.Performance_HC = $Matches[4].Trim()
+            } else {
+                $currentStats.Performance_HC = "" 
+            }
+        }
+    }
+
+    # --- Plate Production Daten extrahieren ---
+    $plateProductionLineObj = $fileContent | Select-String -Pattern "^\s*Plate Production:\s*(\d+)\s*,\s*Exposed Plates:\s*(\d+)\s*,\s*Damaged Plates:\s*(\d+)\s*$"
+    if ($plateProductionLineObj) {
+        if ($plateProductionLineObj.Line -match "^\s*Plate Production:\s*(\d+)\s*,\s*Exposed Plates:\s*(\d+)\s*,\s*Damaged Plates:\s*(\d+)\s*$") {
+            $currentStats.Plate_Production = [int]$Matches[1].Trim()
+            $currentStats.Exposed_Plates = [int]$Matches[2].Trim()
+            $currentStats.Damaged_Plates = [int]$Matches[3].Trim()
+        }
+    }
+
+    # --- Plate Count Daten extrahieren ---
+    $plateCountLineObj = $fileContent | Select-String -Pattern "^\s*Plate Count:\s*(\d+)\s*$"
+    if ($plateCountLineObj) {
+        if ($plateCountLineObj.Line -match "^\s*Plate Count:\s*(\d+)\s*$") {
+            $currentStats.Plate_Count = [int]$Matches[1].Trim()
+        }
+    }
+
+    # --- Message Statistics Daten extrahieren ---
+    $startIndex = -1
+    $endIndex = -1
+    for ($i = 0; $i -lt $fileContent.Length; $i++) {
+        if ($fileContent[$i] -match "^\s*Message Statistics:\s*$") {
+            $startIndex = $i
+        } elseif ($startIndex -ne -1 -and $fileContent[$i] -match "^\s*--------------------------------------------------------------------------------------------------------------------------\s*$") {
+            if ($i -gt $startIndex + 1) {
+                $endIndex = $i
+                break
+            }
+        }
+    }
+
+    if ($startIndex -ne -1 -and $endIndex -ne -1) {
+        $messageStatsBlock = $fileContent[($startIndex + 2)..($endIndex - 1)]
+        foreach ($line in $messageStatsBlock) {
+            if ($line -match "^\s*(\d+)\s*\|.*?\|(ERR_\d+).*$") {
+                $count = [int]$Matches[1].Trim()
+                $errorCode = $Matches[2].Trim()
+                if ($errorCodesToTrack -contains $errorCode) {
+                    $propertyName = "E_" + $errorCode.Replace('ERR_','')
+                    $currentStats.$propertyName = ([int]$count) # Sicherstellen, dass der Wert als [int] gesetzt wird
+                }
+            }
+        }
+    } else {
+        Write-Warning "Message Statistics Block in Datei '$($_.Name)' nicht gefunden oder unvollständig. Fehlerzählungen bleiben 0."
+    }
+
+    $allStatsObjects += $currentStats
+}
+
+# --- Statistik-XLSX-Datei schreiben ---
+if ($allStatsObjects.Count -gt 0) {
+    Write-Host "`n--- Öffne Speicherdialog für die Statistik-XLSX-Datei ---" -ForegroundColor Yellow
+
+    # Erstelle den Speichern-Dialog
+    Add-Type -AssemblyName System.Windows.Forms
+    $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
+    $saveFileDialog.Filter = "Excel-Dateien (*.xlsx)|*.xlsx|Alle Dateien (*.*)|*.*"
+    $saveFileDialog.Title = "Statistik-Datei speichern unter"
+    $saveFileDialog.FileName = "Gesamtauswertung_Statistik_Logfiles.xlsx"
+    $saveFileDialog.InitialDirectory = $logFilesPath # Setzt den Startordner auf den ausgewählten Log-Pfad
+
+    $saveResult = $saveFileDialog.ShowDialog()
+
+    if ($saveResult -eq [System.Windows.Forms.DialogResult]::OK) {
+        $outputStatsXlsxFile = $saveFileDialog.FileName
+        Write-Host "Die Statistikdatei wird unter '$outputStatsXlsxFile' gespeichert." -ForegroundColor Green
+        
+        # Try-Catch Block für den Export
+        try {
+            $allStatsObjects | Export-Excel -Path $outputStatsXlsxFile -AutoSize -ClearSheet -AutoFilter -ErrorAction Stop
+            Write-Host "-------------------------------------" -ForegroundColor Green
+            Write-Host "Statistik-Verarbeitung abgeschlossen!" -ForegroundColor Green
+            Write-Host "Die Daten wurden erfolgreich gespeichert." -ForegroundColor Green
+            Write-Host "Gesamtzahl der Statistik-Einträge: $($allStatsObjects.Count)" -ForegroundColor Green
+
+        } catch {
+            Write-Error "FEHLER beim Exportieren der Excel-Datei: $($_.Exception.Message)"
+            Write-Error "Möglicherweise ist die Datei '$outputStatsXlsxFile' geöffnet und blockiert den Zugriff. Bitte schließen Sie die Datei und versuchen Sie es erneut."
+        }
+    } else {
+        Write-Warning "Speichern abgebrochen. Die Statistik-Datei wurde nicht erstellt."
+    }
+} else {
+    Write-Warning "`nKeine Daten zum Exportieren gefunden. Es wurde keine Excel-Datei erstellt."
+}
