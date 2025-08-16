@@ -1,4 +1,10 @@
 # Gesamtes PowerShell-Skript zur Analyse von .LA1.txt Logdateien und Erstellung einer Statistik-XLSX
+# Version: Nur Datenerfassung und Export ohne Diagrammerstellung.
+
+# --- System- und Modulvoraussetzungen am Anfang laden ---
+# Benötigt für GUI-Elemente (einmalig am Anfang laden)
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
 # --- Konfiguration ---
 # Standardwert für "Performance_Potential", falls in der Logdatei "No Information" steht.
@@ -10,7 +16,6 @@ Write-Host "Standardwert für 'Potential' ist auf '$defaultPotentialValue' gesetz
 $logFilesPath = $null
 
 do {
-    Add-Type -AssemblyName System.Windows.Forms
     $browser = New-Object System.Windows.Forms.FolderBrowserDialog
     # Setze den Dialog-Titel für mehr Klarheit
     $browser.Description = "Bitte wählen Sie den Ordner mit den .LA1.txt Logdateien aus."
@@ -229,7 +234,6 @@ if ($allStatsObjects.Count -gt 0) {
     Write-Host "`n--- Öffne Speicherdialog für die Statistik-XLSX-Datei ---" -ForegroundColor Yellow
 
     # Erstelle den Speichern-Dialog
-    Add-Type -AssemblyName System.Windows.Forms
     $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
     $saveFileDialog.Filter = "Excel-Dateien (*.xlsx)|*.xlsx|Alle Dateien (*.*)|*.*"
     $saveFileDialog.Title = "Statistik-Datei speichern unter"
@@ -244,10 +248,12 @@ if ($allStatsObjects.Count -gt 0) {
         
         # Try-Catch Block für den Export
         try {
-            $allStatsObjects | Export-Excel -Path $outputStatsXlsxFile -AutoSize -ClearSheet -AutoFilter -ErrorAction Stop
+            # Export der Rohdaten auf das erste Arbeitsblatt
+            $allStatsObjects | Export-Excel -Path $outputStatsXlsxFile -AutoSize -ClearSheet -AutoFilter -WorksheetName "Rohdaten" -ErrorAction Stop
+
             Write-Host "-------------------------------------" -ForegroundColor Green
             Write-Host "Statistik-Verarbeitung abgeschlossen!" -ForegroundColor Green
-            Write-Host "Die Daten wurden erfolgreich gespeichert." -ForegroundColor Green
+            Write-Host "Die Daten wurden in '$outputStatsXlsxFile' gespeichert." -ForegroundColor Green
             Write-Host "Gesamtzahl der Statistik-Einträge: $($allStatsObjects.Count)" -ForegroundColor Green
 
         } catch {
